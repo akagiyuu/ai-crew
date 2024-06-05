@@ -1,0 +1,12 @@
+[package]
+name = "flight_info_crawler"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+chrono = "0.4.38"
+convert_case = "0.6.0"
+futures = "0.3.30"
+thirtyfour = "*"
+tokio = { version = "1.38.0", features = ["full"] }
