@@ -5,6 +5,15 @@ from copy import deepcopy
 import operator
 
 
+class Vector:
+    data: list[float]
+
+    def __init__(self, data: list[float]) -> None:
+        self.data = data
+
+    def norm(self, p: float) -> float:
+        return sum([abs(x) ** p for x in self.data]) ** (1 / p)
+
 class Matrix:
     row_count: int
     column_count: int
@@ -112,7 +121,10 @@ class Matrix:
 
         return reduce(operator.mul, matrices, identity)
 
-a = Matrix([[1, 2, 3], [4, 5, 6]])
-b = Matrix([[7, 8], [9, 10], [11, 12]])
-c = Matrix([[13, 14], [15, 16]])
-print(Matrix.multiply_many([a, b, c]))
+# a = Matrix([[1, 2, 3], [4, 5, 6]])
+# b = Matrix([[7, 8], [9, 10], [11, 12]])
+# c = Matrix([[13, 14], [15, 16]])
+# print(Matrix.multiply_many([a, b, c]))
+
+a = Vector([1, 2, 3, 4])
+print(Vector.norm(a, 3))
