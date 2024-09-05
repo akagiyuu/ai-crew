@@ -121,10 +121,16 @@ class Matrix:
 
         return reduce(operator.mul, matrices, identity)
 
+    def frobenius_norm(self) -> float:
+        return sum([x ** 2 for x in self.data]) ** 0.5
+
 # a = Matrix([[1, 2, 3], [4, 5, 6]])
 # b = Matrix([[7, 8], [9, 10], [11, 12]])
 # c = Matrix([[13, 14], [15, 16]])
 # print(Matrix.multiply_many([a, b, c]))
 
-a = Vector([1, 2, 3, 4])
-print(Vector.norm(a, 3))
+# a = Vector([1, 2, 3, 4])
+# print(Vector.norm(a, 3))
+
+a = Matrix([[1, 2, 3], [4, 5, 6]])
+print(a.frobenius_norm())
