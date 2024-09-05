@@ -8,9 +8,9 @@ import operator
 class Matrix:
     row_count: int
     column_count: int
-    data: list[complex]
+    data: list[float]
 
-    def __init__(self, raw_data: list[list[complex]]) -> None:
+    def __init__(self, raw_data: list[list[float]]) -> None:
         self.row_count = len(raw_data)
         self.column_count = len(raw_data[0])
 
@@ -62,10 +62,10 @@ class Matrix:
             + "\n]"
         )
 
-    def __setitem__(self, key: tuple[int, int], value: complex) -> None:
+    def __setitem__(self, key: tuple[int, int], value: float) -> None:
         self.data[key[0] * self.column_count + key[1]] = value
 
-    def __getitem__(self, key: tuple[int, int]) -> complex:
+    def __getitem__(self, key: tuple[int, int]) -> float:
         return self.data[key[0] * self.column_count + key[1]]
 
     def tranpose(self) -> "Matrix":
