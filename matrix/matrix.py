@@ -43,6 +43,8 @@ class Matrix:
         out_matrix.data = [0 for _ in range(size * size)]
         out_matrix.row_count = size
         out_matrix.column_count = size
+        for i in range(size):
+            out_matrix[i, i] = 1
 
         return out_matrix
 
@@ -105,12 +107,12 @@ class Matrix:
         return out_matrix
 
     @staticmethod
-    def add_many(matrices: list["Matrix"]) -> "Matrix":
-        zero = Matrix.zero(matrices[0].row_count, matrices[0].column_count)
+    def multiply_many(matrices: list["Matrix"]) -> "Matrix":
+        identity = Matrix.identity(matrices[0].row_count)
 
-        return reduce(operator.add, matrices, zero)
+        return reduce(operator.mul, matrices, identity)
 
 a = Matrix([[1, 2, 3], [4, 5, 6]])
-b = Matrix([[2, 1, 0], [1, 0, 1]])
-c = Matrix([[1, 0, 0], [0, 1, 0]])
-print(Matrix.add_many([a, b, c]))
+b = Matrix([[7, 8], [9, 10], [11, 12]])
+c = Matrix([[13, 14], [15, 16]])
+print(Matrix.multiply_many([a, b, c]))
