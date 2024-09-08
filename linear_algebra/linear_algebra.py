@@ -1,8 +1,9 @@
 from __future__ import annotations
 from functools import reduce
-from typing import Optional, override
+from typing import override
 from copy import deepcopy
 import operator
+import math
 
 
 class Vector:
@@ -53,9 +54,14 @@ class Matrix:
     def __getitem__(self, key: tuple[int, int]) -> float:
         return self.data[key[0] * self.column_count + key[1]]
 
-    """
-    Clone a matrix
-    """
+    def __cmp__(self, other: Matrix) -> bool:
+        if self.row_count != other.row_count or self.column_count != other.column_count:
+            return False
+
+        return all(
+            math.isclose(self.data[i], other.data[i]) for i in range(len(self.data))
+        )
+
     @staticmethod
     def from_matrix(matrix: Matrix) -> Matrix:
         out_matrix = Matrix.__new__(Matrix)
@@ -146,40 +152,104 @@ class Matrix:
         for i in range(self.column_count):
             self[target_row, i] += scalar * self[value_row, i]
 
-    def gaussian_elimination(self) -> tuple[Matrix, int]:
-        out_matrix = Matrix.from_matrix(self)
-        if out_matrix.row_count > out_matrix.column_count:
-            out_matrix = out_matrix.transpose()
+    def first_minor(self, pivot: tuple[int, int]) -> Matrix:
+        data: list[float] = []
+        for i in range(self.row_count):
+            if i == pivot[0]:
+                continue
+            for j in range(self.column_count):
+                if j == pivot[1]:
+                    continue
+                data.append(self[i, j])
+
+        out_matrix = Matrix.__new__(Matrix)
+        out_matrix.data = data
+        out_matrix.row_count = self.row_count - 1
+        out_matrix.column_count = self.column_count - 1
+
+        return out_matrix
+
+    def adjugate(self) -> Matrix:
+        data: list[float] = []
+        for i in range(self.row_count):
+            for j in range(self.column_count):
+                data.append(sign(j, i) * self.first_minor((j, i)).determinant())
+
+        out_matrix = Matrix.__new__(Matrix)
+        out_matrix.data = data
+        out_matrix.row_count = self.row_count
+        out_matrix.column_count = self.column_count
+
+        return out_matrix
+
+    def gauss_jordan_elimination(self) -> tuple[Matrix, Matrix, int, float]:
+        size = self.row_count
+        original_matrix = Matrix.from_matrix(self)
+        inverse_matrix = Matrix.identity(size)
         swap_count = 0
+        rows_scalar = 1
 
-        for i in range(out_matrix.row_count):
+        for i in range(size):
             max_entry_row = i
-            max_entry = abs(out_matrix[i, i])
+            max_entry = abs(original_matrix[i, i])
 
-            for j in range(i + 1, out_matrix.row_count):
-                value = abs(out_matrix[j, i])
+            # find row with max absolute value in column i
+            for j in range(i + 1, original_matrix.row_count):
+                value = abs(original_matrix[j, i])
                 if value > max_entry:
                     max_entry = value
                     max_entry_row = j
-                    
+
+            # skip column if values from [i, i] to [size - 1, i] is zero
             if max_entry == 0:
                 continue
 
+            # swap i-th row with row with max value
             if i != max_entry_row:
-                out_matrix.swap_row(i, max_entry_row)
                 swap_count += 1
+                original_matrix.swap_row(i, max_entry_row)
+                inverse_matrix.swap_row(i, max_entry_row)
 
-            for j in range(i + 1, out_matrix.row_count):
-                if out_matrix[j, i] == 0:
+            # make [i + 1, i] to [size - 1, i] equal to 0
+            for j in range(i + 1, size):
+                if original_matrix[j, i] == 0:
                     continue
 
-                scalar = -out_matrix[j, i] / out_matrix[i, i]
-                out_matrix.add_row_with_scalar(i, scalar, j)
+                scalar = -original_matrix[j, i] / original_matrix[i, i]
+                original_matrix.add_row_with_scalar(i, scalar, j)
+                inverse_matrix.add_row_with_scalar(i, scalar, j)
 
-        return out_matrix, swap_count
+        # convert row echelon form to reduced row echelon form
+        for i in range(size - 1, -1, -1):
+            if original_matrix[i, i] == 0:
+                continue
+
+            # make [i - 1, i] to [0, i] equal to 0
+            for j in range(i - 1, -1, -1):
+                if original_matrix[j, i] == 0:
+                    continue
+
+                scalar = -original_matrix[j, i] / original_matrix[i, i]
+                original_matrix.add_row_with_scalar(i, scalar, j)
+                inverse_matrix.add_row_with_scalar(i, scalar, j)
+
+        # make the main diagonal equal to 1
+        for i in range(size):
+            if original_matrix[i, i] == 1:
+                continue
+
+            if original_matrix[i, i] == 0:
+                rows_scalar = 0
+                continue
+
+            rows_scalar *= original_matrix[i, i]
+            inverse_matrix.multiply_row_with_scalar(i, 1 / original_matrix[i, i])
+            original_matrix.multiply_row_with_scalar(i, 1 / original_matrix[i, i])
+
+        return original_matrix, inverse_matrix, swap_count, rows_scalar
 
     def determinant(self) -> float:
-        # assert self.row_count == self.column_count
+        assert self.row_count == self.column_count
         # size = self.row_count
         #
         # if size == 1:
@@ -190,77 +260,13 @@ class Matrix:
         # i = 0
         # return sum(
         #     [
-        #         sign(i, j) * self[i, j] * self.minor((i, j)).determinant()
+        #         sign(i, j) * self[i, j] * self.first_minor((i, j)).determinant()
         #         for j in range(size)
         #     ]
         # )
-        row_echelon_matrix, swap_count = Matrix.from_matrix(self).gaussian_elimination()
+        _, _, swap_count, scalar = self.gauss_jordan_elimination()
 
-        size = min(row_echelon_matrix.row_count, row_echelon_matrix.column_count)
-        return reduce(
-            operator.mul,
-            [
-                row_echelon_matrix[i, i] * (1 if swap_count % 2 == 0 else -1)
-                for i in range(size)
-            ],
-            1,
-        )
-
-    def gauss_jordan_elimination(self) -> tuple[Matrix, Matrix]:
-        assert self.row_count == self.column_count
-
-        size = self.row_count
-        original_matrix = Matrix.from_matrix(self)
-        out_matrix = Matrix.identity(size)
-
-        original_matrix = Matrix.from_matrix(self)
-
-        for i in range(size):
-            max_entry_row = i
-            max_entry = abs(original_matrix[i, i])
-
-            for j in range(i + 1, original_matrix.row_count):
-                value = abs(original_matrix[j, i])
-                if value > max_entry:
-                    max_entry = value
-                    max_entry_row = j
-                    
-            if max_entry == 0:
-                continue
-
-            if i != max_entry_row:
-                original_matrix.swap_row(i, max_entry_row)
-                out_matrix.swap_row(i, max_entry_row)
-
-            for j in range(i + 1, size):
-                if original_matrix[j, i] == 0:
-                    continue
-
-                scalar = -original_matrix[j, i] / original_matrix[i, i]
-                original_matrix.add_row_with_scalar(i, scalar, j)
-                out_matrix.add_row_with_scalar(i, scalar, j)
-
-        for i in range(size - 1, -1, -1):
-            if original_matrix[i, i] == 0:
-                continue
-            
-            for j in range(i - 1, -1, -1):
-                if original_matrix[j, i] == 0:
-                    continue
-
-                scalar = -original_matrix[j, i] / original_matrix[i, i]
-                original_matrix.add_row_with_scalar(i, scalar, j)
-                out_matrix.add_row_with_scalar(i, scalar, j)
-
-            pass
-
-        for i in range(size):
-            if original_matrix[i, i] == 0 or original_matrix[i, i] == 1:
-                continue
-            original_matrix[i, i] = 1
-            out_matrix.multiply_row_with_scalar(i, 1 / original_matrix[i, i])
-
-        return original_matrix, out_matrix
+        return (1 if swap_count % 2 == 0 else -1) * scalar
 
     def inverse(self) -> Matrix | None:
         assert self.row_count == self.column_count
@@ -288,14 +294,13 @@ class Matrix:
     def is_symmetric(self) -> bool:
         if self.row_count != self.column_count:
             return False
-        
+
         half = self.row_count // 2
         for i in range(half):
             for j in range(half):
                 if self[i, j] != self[j, i]:
                     return False
         return True
-
 
     def is_positive_defined(self) -> bool:
         if not self.is_symmetric():
@@ -304,16 +309,3 @@ class Matrix:
 
     def frobenius_norm(self) -> float:
         return sum([x**2 for x in self.data]) ** 0.5
-
-
-# a = Matrix([[1, 2, 3], [4, 5, 6]])
-# b = Matrix([[7, 8], [9, 10], [11, 12]])
-# c = Matrix([[13, 14], [15, 16]])
-# print(Matrix.multiply_many([a, b, c]))
-
-# a = Vector([1, 2, 3, 4])
-# print(Vector.norm(a, 3))
-
-a = Matrix([[1, 2], [2,4]])
-b = Matrix([[-3, -1, 2], [3, 1, 4], [0, 3, -1]])
-print(b.determinant())
