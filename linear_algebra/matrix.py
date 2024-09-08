@@ -1,10 +1,12 @@
 from __future__ import annotations
+from collections import defaultdict
 from functools import reduce
 from typing import override
 from copy import deepcopy
 import operator
 import math
 import sys
+import random
 
 
 def sign(i: float, j: float) -> float:
@@ -86,6 +88,18 @@ class Matrix:
 
         return out_matrix
 
+    @staticmethod
+    def random(row_count: int, column_count: int) -> Matrix:
+        out_matrix = Matrix.__new__(Matrix)
+        out_matrix.data = [
+            random.uniform(sys.float_info.min, sys.float_info.max)
+            for _ in range(row_count * column_count)
+        ]
+        out_matrix.row_count = row_count
+        out_matrix.column_count = column_count
+
+        return out_matrix
+
     """
     Error function taken from matlab
     """
@@ -144,11 +158,17 @@ class Matrix:
 
         return reduce(operator.mul, matrices, identity)
 
+    def multiply_by_scalar(self, scalar: float) -> Matrix:
+        out_matrix = Matrix.from_matrix(self)
+        for i in range(len(self.data)):
+            self.data[i] *= scalar
+        return out_matrix
+
     def swap_row(self, i: int, j: int) -> None:
         for k in range(self.column_count):
             self[i, k], self[j, k] = self[j, k], self[i, k]
 
-    def multiply_row_with_scalar(self, i: int, scalar: float) -> None:
+    def multiply_row_by_scalar(self, i: int, scalar: float) -> None:
         for j in range(self.column_count):
             self[i, j] *= scalar
 
@@ -194,7 +214,7 @@ class Matrix:
         original_matrix = Matrix.from_matrix(self)
         inverse_matrix = Matrix.identity(size)
         swap_count = 0
-        rows_scalar = 1
+        abs_determinant = 1
 
         for i in range(size):
             max_entry_row = i
@@ -242,18 +262,17 @@ class Matrix:
 
         # make the main diagonal equal to 1
         for i in range(size):
+            abs_determinant *= original_matrix[i, i]
             if abs(original_matrix[i, i] - 1) < error:
                 continue
 
             if abs(original_matrix[i, i]) < error:
-                rows_scalar = 0
                 continue
 
-            rows_scalar *= original_matrix[i, i]
-            inverse_matrix.multiply_row_with_scalar(i, 1 / original_matrix[i, i])
-            original_matrix.multiply_row_with_scalar(i, 1 / original_matrix[i, i])
+            inverse_matrix.multiply_row_by_scalar(i, 1 / original_matrix[i, i])
+            original_matrix.multiply_row_by_scalar(i, 1 / original_matrix[i, i])
 
-        return original_matrix, inverse_matrix, swap_count, rows_scalar
+        return original_matrix, inverse_matrix, swap_count, abs_determinant
 
     def determinant(self) -> float:
         assert self.row_count == self.column_count
@@ -271,9 +290,10 @@ class Matrix:
         #         for j in range(size)
         #     ]
         # )
-        _, _, swap_count, scalar = self.gauss_jordan_elimination()
+        _, _, swap_count, abs_determinant = self.gauss_jordan_elimination()
 
-        return (1 if swap_count % 2 == 0 else -1) * scalar
+        return abs_determinant * (1 if swap_count % 2 == 0 else -1)
+
 
     def inverse(self) -> Matrix | None:
         assert self.row_count == self.column_count
@@ -292,7 +312,7 @@ class Matrix:
 
         return rank
 
-    def eigenpairs(self) -> list[tuple[list[float], float]]:
+    def eigenpairs(self) -> list[tuple[float, int, Matrix]]:
         pass
 
     def diagonalize(self) -> tuple[Matrix, Matrix, Matrix]:
@@ -312,7 +332,12 @@ class Matrix:
     def is_positive_defined(self) -> bool:
         if not self.is_symmetric():
             return False
-        pass
+
+        for eigenvalue, _, _ in self.eigenpairs():
+            if eigenvalue <= 0:
+                return False
+
+        return True
 
     def frobenius_norm(self) -> float:
         return sum([x**2 for x in self.data]) ** 0.5
