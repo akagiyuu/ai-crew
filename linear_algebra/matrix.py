@@ -5,17 +5,6 @@ from copy import deepcopy
 import operator
 import math
 
-
-class Vector:
-    data: list[float]
-
-    def __init__(self, data: list[float]) -> None:
-        self.data = data
-
-    def norm(self, p: float) -> float:
-        return sum([abs(x) ** p for x in self.data]) ** (1 / p)
-
-
 def sign(i: float, j: float) -> float:
     return 1 if (i + j) % 2 == 0 else -1
 

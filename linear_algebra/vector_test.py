@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from .linear_algebra import Vector
+from .vector import Vector
 import math
 import numpy as np
 import pytest

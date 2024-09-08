@@ -1,6 +1,6 @@
 from functools import reduce
 from collections.abc import Iterator
-from .linear_algebra import Matrix
+from .matrix import Matrix
 import math
 import numpy as np
 import pytest
