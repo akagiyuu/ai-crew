@@ -33,6 +33,29 @@ class Matrix:
 
         self.data = [entry for row in raw_data for entry in row]
 
+    @override
+    def __str__(self) -> str:
+        return (
+            "[\n"
+            + "\n".join(
+                [
+                    "    "
+                    + ", ".join([str(self[i, j]) for j in range(self.column_count)])
+                    for i in range(self.row_count)
+                ]
+            )
+            + "\n]"
+        )
+
+    def __setitem__(self, key: tuple[int, int], value: float) -> None:
+        self.data[key[0] * self.column_count + key[1]] = value
+
+    def __getitem__(self, key: tuple[int, int]) -> float:
+        return self.data[key[0] * self.column_count + key[1]]
+
+    """
+    Clone a matrix
+    """
     @staticmethod
     def from_matrix(matrix: Matrix) -> Matrix:
         out_matrix = Matrix.__new__(Matrix)
@@ -62,26 +85,6 @@ class Matrix:
 
         return out_matrix
 
-    @override
-    def __str__(self) -> str:
-        return (
-            "[\n"
-            + "\n".join(
-                [
-                    "    "
-                    + ", ".join([str(self[i, j]) for j in range(self.column_count)])
-                    for i in range(self.row_count)
-                ]
-            )
-            + "\n]"
-        )
-
-    def __setitem__(self, key: tuple[int, int], value: float) -> None:
-        self.data[key[0] * self.column_count + key[1]] = value
-
-    def __getitem__(self, key: tuple[int, int]) -> float:
-        return self.data[key[0] * self.column_count + key[1]]
-
     def tranpose(self) -> Matrix:
         out_matrix = Matrix.from_matrix(self)
         out_matrix.row_count, out_matrix.column_count = (
@@ -98,11 +101,11 @@ class Matrix:
     def __add__(self, other: Matrix) -> Matrix:
         assert self.column_count == other.column_count
         assert self.row_count == other.row_count
+        length = len(self.data)
 
         out_matrix = Matrix.from_matrix(self)
-        for i in range(self.row_count):
-            for j in range(self.column_count):
-                out_matrix[i, j] = self[i, j] + other[i, j]
+        for i in range(length):
+            out_matrix.data[i] += other.data[i]
 
         return out_matrix
 
@@ -128,45 +131,6 @@ class Matrix:
         identity = Matrix.identity(matrices[0].row_count)
 
         return reduce(operator.mul, matrices, identity)
-
-    def multiply_scalar(self, scalar: float) -> Matrix:
-        out_matrix = Matrix.from_matrix(self)
-
-        for i in range(self.row_count):
-            for j in range(self.column_count):
-                out_matrix[i, j] *= scalar
-
-        return out_matrix
-
-    def minor(self, pivot: tuple[int, int]) -> Matrix:
-        data: list[float] = []
-        for i in range(self.row_count):
-            if i == pivot[0]:
-                continue
-            for j in range(self.column_count):
-                if j == pivot[1]:
-                    continue
-                data.append(self[i, j])
-
-        out_matrix = Matrix.__new__(Matrix)
-        out_matrix.data = data
-        out_matrix.row_count = self.row_count - 1
-        out_matrix.column_count = self.column_count - 1
-
-        return out_matrix
-
-    def adjugate(self) -> Matrix:
-        data: list[float] = []
-        for i in range(self.row_count):
-            for j in range(self.column_count):
-                data.append(sign(j, i) * self.minor((j, i)).determinant())
-
-        out_matrix = Matrix.__new__(Matrix)
-        out_matrix.data = data
-        out_matrix.row_count = self.row_count
-        out_matrix.column_count = self.column_count
-
-        return out_matrix
 
     def swap_row(self, i: int, j: int) -> None:
         for k in range(self.column_count):
@@ -315,7 +279,7 @@ class Matrix:
 
         return rank
 
-    def eigenvalues(self) -> list[float]:
+    def eigenpairs(self) -> list[tuple[list[float], float]]:
         pass
 
     def diagonalize(self) -> tuple[Matrix, Matrix, Matrix]:
