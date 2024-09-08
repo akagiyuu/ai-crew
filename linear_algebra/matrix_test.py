@@ -78,6 +78,12 @@ def test_determinant(matrices: Iterator[list[list[float]]]):
     for matrix in matrices:
         assert math.isclose(Matrix(matrix).determinant(), np.linalg.det(matrix))
 
+
+def test_rank(matrices: Iterator[list[list[float]]]):
+    for matrix in matrices:
+        assert math.isclose(Matrix(matrix).rank(), np.linalg.matrix_rank(matrix))
+
+
 def test_frobenius_norm(matrices: Iterator[list[list[float]]]):
     for matrix in matrices:
         assert math.isclose(Matrix(matrix).frobenius_norm(), np.linalg.norm(matrix))
