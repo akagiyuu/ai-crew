@@ -4,6 +4,8 @@ from typing import override
 from copy import deepcopy
 import operator
 import math
+import sys
+
 
 def sign(i: float, j: float) -> float:
     return 1 if (i + j) % 2 == 0 else -1
@@ -36,6 +38,10 @@ class Matrix:
             )
             + "\n]"
         )
+
+    @override
+    def __repr__(self) -> str:
+        return str(self)
 
     def __setitem__(self, key: tuple[int, int], value: float) -> None:
         self.data[key[0] * self.column_count + key[1]] = value
@@ -79,6 +85,17 @@ class Matrix:
             out_matrix[i, i] = 1
 
         return out_matrix
+
+    """
+    Error function taken from matlab
+    """
+
+    def error(self) -> float:
+        return (
+            max((abs(x) for x in self.data))
+            * max(self.row_count, self.column_count)
+            * sys.float_info.epsilon
+        )
 
     def tranpose(self) -> Matrix:
         out_matrix = Matrix.from_matrix(self)
@@ -173,6 +190,7 @@ class Matrix:
 
     def gauss_jordan_elimination(self) -> tuple[Matrix, Matrix, int, float]:
         size = self.row_count
+        error = self.error()
         original_matrix = Matrix.from_matrix(self)
         inverse_matrix = Matrix.identity(size)
         swap_count = 0
@@ -190,7 +208,7 @@ class Matrix:
                     max_entry_row = j
 
             # skip column if values from [i, i] to [size - 1, i] is zero
-            if max_entry == 0:
+            if abs(max_entry) < error:
                 continue
 
             # swap i-th row with row with max value
@@ -201,7 +219,7 @@ class Matrix:
 
             # make [i + 1, i] to [size - 1, i] equal to 0
             for j in range(i + 1, size):
-                if original_matrix[j, i] == 0:
+                if abs(original_matrix[j, i]) <= error:
                     continue
 
                 scalar = -original_matrix[j, i] / original_matrix[i, i]
@@ -210,12 +228,12 @@ class Matrix:
 
         # convert row echelon form to reduced row echelon form
         for i in range(size - 1, -1, -1):
-            if original_matrix[i, i] == 0:
+            if abs(original_matrix[i, i]) < error:
                 continue
 
             # make [i - 1, i] to [0, i] equal to 0
             for j in range(i - 1, -1, -1):
-                if original_matrix[j, i] == 0:
+                if abs(original_matrix[j, i]) < error:
                     continue
 
                 scalar = -original_matrix[j, i] / original_matrix[i, i]
@@ -224,10 +242,10 @@ class Matrix:
 
         # make the main diagonal equal to 1
         for i in range(size):
-            if original_matrix[i, i] == 1:
+            if abs(original_matrix[i, i] - 1) < error:
                 continue
 
-            if original_matrix[i, i] == 0:
+            if abs(original_matrix[i, i]) < error:
                 rows_scalar = 0
                 continue
 
@@ -269,7 +287,7 @@ class Matrix:
         rank = 0
 
         for i in range(reduced_row_echelon_matrix.row_count):
-            if reduced_row_echelon_matrix[i, i] != 0:
+            if abs(reduced_row_echelon_matrix[i, i]) > self.error():
                 rank += 1
 
         return rank
