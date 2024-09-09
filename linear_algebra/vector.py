@@ -27,6 +27,9 @@ class Vector:
     def __repr__(self) -> str:
         return str(self)
 
+    def __len__(self) -> int:
+        return len(self.data)
+
     def __add__(self, other: Vector) -> Vector:
         return Vector([self.data[i] + other.data[i] for i in range(len(self.data))])
 
@@ -68,6 +71,7 @@ class Vector:
             )
 
         for i in range(len(othornomalized_columns)):
-            othornomalized_columns[i] = othornomalized_columns[i].normalize()
+            if othornomalized_columns[i].norm(2) != 0:
+                othornomalized_columns[i] = othornomalized_columns[i].normalize()
 
         return othornomalized_columns

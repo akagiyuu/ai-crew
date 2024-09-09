@@ -1,12 +1,10 @@
 from __future__ import annotations
-from collections import defaultdict
 from functools import reduce
 from typing import override
 from copy import deepcopy
-import operator
 import math
 import sys
-import random
+from .vector import Vector
 
 
 def sign(i: float, j: float) -> float:
@@ -26,6 +24,52 @@ class Matrix:
             assert len(row) == self.column_count
 
         self.data = [entry for row in raw_data for entry in row]
+
+    @staticmethod
+    def from_data_with_dimension(
+        data: list[float], row_count: int, column_count: int
+    ) -> Matrix:
+        out_matrix = Matrix.__new__(Matrix)
+        out_matrix.data = data
+        out_matrix.row_count = row_count
+        out_matrix.column_count = column_count
+
+        return out_matrix
+
+    @staticmethod
+    def from_column_vector(column: list[Vector]) -> Matrix:
+        row_count = len(column[0])
+        column_count = len(column)
+        data: list[float] = []
+        for i in range(row_count):
+            for j in range(column_count):
+                data.append(column[j][i])
+        return Matrix.from_data_with_dimension(data, row_count, column_count)
+
+    @staticmethod
+    def from_diagonal(diagonal: list[float]) -> Matrix:
+        out_matrix = Matrix.zero(len(diagonal), len(diagonal))
+        for i in range(len(diagonal)):
+            out_matrix[i, i] = diagonal[i]
+        return out_matrix
+
+    @staticmethod
+    def from_matrix(matrix: Matrix) -> Matrix:
+        return Matrix.from_data_with_dimension(
+            deepcopy(matrix.data), matrix.row_count, matrix.column_count
+        )
+
+    @staticmethod
+    def zero(row_count: int, column_count: int) -> Matrix:
+        data = [0.0 for _ in range(row_count * column_count)]
+        return Matrix.from_data_with_dimension(data, row_count, column_count)
+
+    @staticmethod
+    def identity(size: int) -> Matrix:
+        data = [0.0 for _ in range(size * size)]
+        for i in range(size):
+            data[i * size + i] = 1
+        return Matrix.from_data_with_dimension(data, size, size)
 
     @override
     def __str__(self) -> str:
@@ -55,54 +99,11 @@ class Matrix:
         if self.row_count != other.row_count or self.column_count != other.column_count:
             return False
 
+        error = min(self.error(), other.error())
+
         return all(
-            math.isclose(self.data[i], other.data[i]) for i in range(len(self.data))
+            abs(self.data[i] - other.data[i]) < error for i in range(len(self.data))
         )
-
-    @staticmethod
-    def from_matrix(matrix: Matrix) -> Matrix:
-        out_matrix = Matrix.__new__(Matrix)
-        out_matrix.data = deepcopy(matrix.data)
-        out_matrix.row_count = matrix.row_count
-        out_matrix.column_count = matrix.column_count
-
-        return out_matrix
-
-    @staticmethod
-    def zero(row_count: int, column_count: int) -> Matrix:
-        out_matrix = Matrix.__new__(Matrix)
-        out_matrix.data = [0 for _ in range(row_count * column_count)]
-        out_matrix.row_count = row_count
-        out_matrix.column_count = column_count
-
-        return out_matrix
-
-    @staticmethod
-    def identity(size: int) -> Matrix:
-        out_matrix = Matrix.__new__(Matrix)
-        out_matrix.data = [0 for _ in range(size * size)]
-        out_matrix.row_count = size
-        out_matrix.column_count = size
-        for i in range(size):
-            out_matrix[i, i] = 1
-
-        return out_matrix
-
-    @staticmethod
-    def random(row_count: int, column_count: int) -> Matrix:
-        out_matrix = Matrix.__new__(Matrix)
-        out_matrix.data = [
-            random.uniform(sys.float_info.min, sys.float_info.max)
-            for _ in range(row_count * column_count)
-        ]
-        out_matrix.row_count = row_count
-        out_matrix.column_count = column_count
-
-        return out_matrix
-
-    """
-    Error function taken from matlab
-    """
 
     def error(self) -> float:
         return (
@@ -110,6 +111,13 @@ class Matrix:
             * max(self.row_count, self.column_count)
             * sys.float_info.epsilon
         )
+
+    def to_column_vector(self) -> list[Vector]:
+        vectors = [Vector.zero(self.row_count) for _ in range(self.column_count)]
+        for i in range(self.row_count):
+            for j in range(self.column_count):
+                vectors[j][i] = self[i, j]
+        return vectors
 
     def tranpose(self) -> Matrix:
         out_matrix = Matrix.from_matrix(self)
@@ -135,13 +143,29 @@ class Matrix:
 
         return out_matrix
 
-    @staticmethod
-    def add_many(matrices: list[Matrix]) -> Matrix:
-        zero = Matrix.zero(matrices[0].row_count, matrices[0].column_count)
+    def __sub__(self, other: Matrix) -> Matrix:
+        assert self.column_count == other.column_count
+        assert self.row_count == other.row_count
+        length = len(self.data)
 
-        return reduce(operator.add, matrices, zero)
+        out_matrix = Matrix.from_matrix(self)
+        for i in range(length):
+            out_matrix.data[i] -= other.data[i]
 
-    def __mul__(self, other: Matrix) -> Matrix:
+        return out_matrix
+
+    def __mul__(self, other: float | Vector) -> Matrix | Vector:
+        if isinstance(other, float):
+            out_matrix = Matrix.from_matrix(self)
+            for i in range(len(self.data)):
+                self.data[i] *= other
+            return out_matrix
+        elif isinstance(other, Vector):
+            return Vector((self @ Matrix.from_column_vector([other])).data)
+
+        return Matrix.from_matrix(self)
+
+    def __matmul__(self, other: Matrix) -> Matrix:
         assert self.column_count == other.row_count
 
         out_matrix = Matrix.zero(self.row_count, other.column_count)
@@ -153,16 +177,18 @@ class Matrix:
         return out_matrix
 
     @staticmethod
+    def add_many(matrices: list[Matrix]) -> Matrix:
+        return reduce(
+            lambda x, y: x + y,
+            matrices,
+            Matrix.zero(matrices[0].row_count, matrices[0].column_count),
+        )
+
+    @staticmethod
     def multiply_many(matrices: list[Matrix]) -> Matrix:
         identity = Matrix.identity(matrices[0].row_count)
 
-        return reduce(operator.mul, matrices, identity)
-
-    def multiply_by_scalar(self, scalar: float) -> Matrix:
-        out_matrix = Matrix.from_matrix(self)
-        for i in range(len(self.data)):
-            self.data[i] *= scalar
-        return out_matrix
+        return reduce(lambda x, y: x @ y, matrices, identity)
 
     def swap_row(self, i: int, j: int) -> None:
         for k in range(self.column_count):
@@ -188,23 +214,16 @@ class Matrix:
                     continue
                 data.append(self[i, j])
 
-        out_matrix = Matrix.__new__(Matrix)
-        out_matrix.data = data
-        out_matrix.row_count = self.row_count - 1
-        out_matrix.column_count = self.column_count - 1
-
-        return out_matrix
+        return Matrix.from_data_with_dimension(
+            data, self.row_count - 1, self.column_count - 1
+        )
 
     def adjugate(self) -> Matrix:
-        data: list[float] = []
+        out_matrix = Matrix.zero(self.row_count, self.column_count)
+
         for i in range(self.row_count):
             for j in range(self.column_count):
-                data.append(sign(j, i) * self.first_minor((j, i)).determinant())
-
-        out_matrix = Matrix.__new__(Matrix)
-        out_matrix.data = data
-        out_matrix.row_count = self.row_count
-        out_matrix.column_count = self.column_count
+                out_matrix[i, j] = sign(j, i) * self.first_minor((j, i)).determinant()
 
         return out_matrix
 
@@ -276,29 +295,14 @@ class Matrix:
 
     def determinant(self) -> float:
         assert self.row_count == self.column_count
-        # size = self.row_count
-        #
-        # if size == 1:
-        #     return abs(self.data[0])
-        # if size == 2:
-        #     return self[0, 0] * self[1, 1] - self[0, 1] * self[1, 0]
-        #
-        # i = 0
-        # return sum(
-        #     [
-        #         sign(i, j) * self[i, j] * self.first_minor((i, j)).determinant()
-        #         for j in range(size)
-        #     ]
-        # )
         _, _, swap_count, abs_determinant = self.gauss_jordan_elimination()
 
         return abs_determinant * (1 if swap_count % 2 == 0 else -1)
 
-
     def inverse(self) -> Matrix | None:
         assert self.row_count == self.column_count
-
-        if self.determinant() == 0:
+        size = self.column_count
+        if self.rank() != size:
             return None
         return self.gauss_jordan_elimination()[1]
 
@@ -312,19 +316,67 @@ class Matrix:
 
         return rank
 
-    def eigenpairs(self) -> list[tuple[float, int, Matrix]]:
-        pass
+    def qr_decomposition(self) -> tuple[Matrix, Matrix]:
+        q = Matrix.from_column_vector(
+            Vector.gram_schimidt_process(self.to_column_vector())
+        )
+        r = q.tranpose() @ self
+        return q, r
 
-    def diagonalize(self) -> tuple[Matrix, Matrix, Matrix]:
-        pass
+    def schur_form(self) -> Matrix:
+        ITERATION_COUNT = 100
+
+        out_matrix = self
+        for _ in range(ITERATION_COUNT):
+            q, r = out_matrix.qr_decomposition()
+            out_matrix = r @ q
+
+        return out_matrix
+
+    def eigenvalues(self) -> list[float]:
+        assert self.row_count == self.column_count
+        size = self.row_count
+
+        schur_form = self.schur_form()
+
+        eigenvalues = [schur_form[i, i] for i in range(size)]
+        eigenvalues.sort(reverse=True)
+
+        return eigenvalues
+
+    def eigenvectors(self) -> list[Vector]:
+        ITERATION_COUNT = 100
+
+        assert self.row_count == self.column_count
+
+        eigenvectors_matrix, _ = self.qr_decomposition()
+
+        for i in range(ITERATION_COUNT):
+            x = self @ eigenvectors_matrix
+            eigenvectors_matrix, _ = x.qr_decomposition()
+
+        return eigenvectors_matrix.to_column_vector()
+
+    def diagonalize(self) -> tuple[Matrix, Matrix, Matrix] | None:
+        assert self.row_count == self.column_count
+        eigenvalues = self.eigenvalues()
+        eigenvectors = self.eigenvectors()
+
+        lambda_matrix = Matrix.from_diagonal(eigenvalues)
+        q = Matrix.from_column_vector(eigenvectors)
+        q_inverse = q.inverse( )
+        if q_inverse is None:
+            return None
+
+        return q, lambda_matrix, q_inverse
 
     def is_symmetric(self) -> bool:
         if self.row_count != self.column_count:
             return False
 
-        half = self.row_count // 2
-        for i in range(half):
-            for j in range(half):
+        size = self.row_count
+        for i in range(size):
+            for j in range(size):
                 if self[i, j] != self[j, i]:
                     return False
         return True
@@ -333,7 +385,10 @@ class Matrix:
         if not self.is_symmetric():
             return False
 
-        for eigenvalue, _, _ in self.eigenpairs():
+        for (
+            eigenvalue,
+            _,
+        ) in self.eigenpairs():
             if eigenvalue <= 0:
                 return False
 
