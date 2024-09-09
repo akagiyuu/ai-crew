@@ -56,17 +56,17 @@ class Vector:
         return sum([abs(x) ** p for x in self.data]) ** (1 / p)
 
     @staticmethod
-    def gram_schimidt_process(matrix_rows: list[Vector]) -> list[Vector]:
+    def gram_schimidt_process(vectors: list[Vector]) -> list[Vector]:
         othornomalized_columns: list[Vector] = []
-        othornomalized_columns.append(matrix_rows[0])
+        othornomalized_columns.append(vectors[0])
 
-        for i in range(1, len(matrix_rows)):
+        for i in range(1, len(vectors)):
             othornomalized_columns.append(
-                matrix_rows[i]
+                vectors[i]
                 - reduce(
-                    lambda acc, u: acc + matrix_rows[i].project(u),
+                    lambda acc, u: acc + vectors[i].project(u),
                     othornomalized_columns,
-                    Vector.zero(len(matrix_rows[0].data)),
+                    Vector.zero(len(vectors[0].data)),
                 )
             )
 

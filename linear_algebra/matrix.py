@@ -2,7 +2,6 @@ from __future__ import annotations
 from functools import reduce
 from typing import override
 from copy import deepcopy
-import math
 import sys
 from .vector import Vector
 
@@ -95,43 +94,6 @@ class Matrix:
     def __getitem__(self, key: tuple[int, int]) -> float:
         return self.data[key[0] * self.column_count + key[1]]
 
-    def __cmp__(self, other: Matrix) -> bool:
-        if self.row_count != other.row_count or self.column_count != other.column_count:
-            return False
-
-        error = min(self.error(), other.error())
-
-        return all(
-            abs(self.data[i] - other.data[i]) < error for i in range(len(self.data))
-        )
-
-    def error(self) -> float:
-        return (
-            max((abs(x) for x in self.data))
-            * max(self.row_count, self.column_count)
-            * sys.float_info.epsilon
-        )
-
-    def to_column_vector(self) -> list[Vector]:
-        vectors = [Vector.zero(self.row_count) for _ in range(self.column_count)]
-        for i in range(self.row_count):
-            for j in range(self.column_count):
-                vectors[j][i] = self[i, j]
-        return vectors
-
-    def tranpose(self) -> Matrix:
-        out_matrix = Matrix.from_matrix(self)
-        out_matrix.row_count, out_matrix.column_count = (
-            out_matrix.column_count,
-            out_matrix.row_count,
-        )
-
-        for i in range(out_matrix.row_count):
-            for j in range(out_matrix.column_count):
-                out_matrix[i, j] = self[j, i]
-
-        return out_matrix
-
     def __add__(self, other: Matrix) -> Matrix:
         assert self.column_count == other.column_count
         assert self.row_count == other.row_count
@@ -176,19 +138,15 @@ class Matrix:
 
         return out_matrix
 
-    @staticmethod
-    def add_many(matrices: list[Matrix]) -> Matrix:
-        return reduce(
-            lambda x, y: x + y,
-            matrices,
-            Matrix.zero(matrices[0].row_count, matrices[0].column_count),
+    def __cmp__(self, other: Matrix) -> bool:
+        if self.row_count != other.row_count or self.column_count != other.column_count:
+            return False
+
+        error = min(self.error(), other.error())
+
+        return all(
+            abs(self.data[i] - other.data[i]) < error for i in range(len(self.data))
         )
-
-    @staticmethod
-    def multiply_many(matrices: list[Matrix]) -> Matrix:
-        identity = Matrix.identity(matrices[0].row_count)
-
-        return reduce(lambda x, y: x @ y, matrices, identity)
 
     def swap_row(self, i: int, j: int) -> None:
         for k in range(self.column_count):
@@ -203,6 +161,47 @@ class Matrix:
     ) -> None:
         for i in range(self.column_count):
             self[target_row, i] += scalar * self[value_row, i]
+
+    def error(self) -> float:
+        return (
+            max((abs(x) for x in self.data))
+            * max(self.row_count, self.column_count)
+            * sys.float_info.epsilon
+        )
+
+    def to_column_vector(self) -> list[Vector]:
+        vectors = [Vector.zero(self.row_count) for _ in range(self.column_count)]
+        for i in range(self.row_count):
+            for j in range(self.column_count):
+                vectors[j][i] = self[i, j]
+        return vectors
+
+    def tranpose(self) -> Matrix:
+        out_matrix = Matrix.from_matrix(self)
+        out_matrix.row_count, out_matrix.column_count = (
+            out_matrix.column_count,
+            out_matrix.row_count,
+        )
+
+        for i in range(out_matrix.row_count):
+            for j in range(out_matrix.column_count):
+                out_matrix[i, j] = self[j, i]
+
+        return out_matrix
+
+    @staticmethod
+    def add_many(matrices: list[Matrix]) -> Matrix:
+        return reduce(
+            lambda x, y: x + y,
+            matrices,
+            Matrix.zero(matrices[0].row_count, matrices[0].column_count),
+        )
+
+    @staticmethod
+    def multiply_many(matrices: list[Matrix]) -> Matrix:
+        identity = Matrix.identity(matrices[0].row_count)
+
+        return reduce(lambda x, y: x @ y, matrices, identity)
 
     def first_minor(self, pivot: tuple[int, int]) -> Matrix:
         data: list[float] = []
@@ -323,11 +322,9 @@ class Matrix:
         r = q.tranpose() @ self
         return q, r
 
-    def schur_form(self) -> Matrix:
-        ITERATION_COUNT = 100
-
+    def schur_form(self, iterations: int = 100) -> Matrix:
         out_matrix = self
-        for _ in range(ITERATION_COUNT):
+        for _ in range(iterations):
             q, r = out_matrix.qr_decomposition()
             out_matrix = r @ q
 
@@ -344,14 +341,12 @@ class Matrix:
 
         return eigenvalues
 
-    def eigenvectors(self) -> list[Vector]:
-        ITERATION_COUNT = 100
-
+    def eigenvectors(self, iterations: int = 100) -> list[Vector]:
         assert self.row_count == self.column_count
 
         eigenvectors_matrix, _ = self.qr_decomposition()
 
-        for i in range(ITERATION_COUNT):
+        for i in range(iterations):
             x = self @ eigenvectors_matrix
             eigenvectors_matrix, _ = x.qr_decomposition()
 
@@ -364,7 +359,7 @@ class Matrix:
 
         lambda_matrix = Matrix.from_diagonal(eigenvalues)
         q = Matrix.from_column_vector(eigenvectors)
-        q_inverse = q.inverse( )
+        q_inverse = q.inverse()
         if q_inverse is None:
             return None
 
@@ -385,10 +380,7 @@ class Matrix:
         if not self.is_symmetric():
             return False
 
-        for (
-            eigenvalue,
-            _,
-        ) in self.eigenpairs():
+        for eigenvalue in self.eigenvalues():
             if eigenvalue <= 0:
                 return False
 
